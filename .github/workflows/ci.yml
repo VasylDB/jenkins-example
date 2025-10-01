@@ -6,122 +6,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  preparation:
-    runs-on: ubuntu-latest
-    outputs:
-      run_id: ${{ steps.prep.outputs.run_id }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Generate RunID and prep.txt (Preparation)
-        id: prep
-        run: |
-          RUN_ID=$(python -c "import uuid; print(uuid.uuid4())")
-          echo "Preparation stage: RunID=${RUN_ID}"
-          echo "Build Number: ${GITHUB_RUN_NUMBER}"
-          printf "RunID=%s\n" "$RUN_ID" | tee prep.txt
-          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Stash prepData (upload artifact)
-        uses: actions/upload-artifact@v4
-        with:
-          name: prepData
-          path: prep.txt
-          if-no-files-found: error
-
-  JobA:
+  run-jobs:
     runs-on: ubuntu-latest
     needs: [preparation]
+    strategy:
+      matrix:
+        name: [JobA, JobB, JobC]
     steps:
       - uses: actions/checkout@v4
-      - name: Unstash prepData
-        uses: actions/download-artifact@v4
-        with:
-          name: prepData
-      - name: Run JobA (make JobA.log)
-        shell: bash
+      - uses: actions/download-artifact@v4
+        with: { name: prepData }
+      - name: Run ${{ matrix.name }}
         run: |
-          echo "JobA running with $(cat prep.txt)" > JobA.log
-          cat JobA.log
-      - name: Stash JobAData
-        uses: actions/upload-artifact@v4
+          echo "${{ matrix.name }} running with $(cat prep.txt)" > ${{ matrix.name }}.log
+          cat ${{ matrix.name }}.log
+      - uses: actions/upload-artifact@v4
         with:
-          name: JobAData
-          path: JobA.log
-
-  JobB:
-    runs-on: ubuntu-latest
-    needs: [preparation]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Unstash prepData
-        uses: actions/download-artifact@v4
-        with:
-          name: prepData
-      - name: Run JobB (make JobB.log)
-        shell: bash
-        run: |
-          echo "JobB running with $(cat prep.txt)" > JobB.log
-          cat JobB.log
-      - name: Stash JobBData
-        uses: actions/upload-artifact@v4
-        with:
-          name: JobBData
-          path: JobB.log
-
-  JobC:
-    runs-on: ubuntu-latest
-    needs: [preparation]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Unstash prepData
-        uses: actions/download-artifact@v4
-        with:
-          name: prepData
-      - name: Run JobC (make JobC.log)
-        shell: bash
-        run: |
-          echo "JobC running with $(cat prep.txt)" > JobC.log
-          cat JobC.log
-      - name: Stash JobCData
-        uses: actions/upload-artifact@v4
-        with:
-          name: JobCData
-          path: JobC.log
-
-  integration:
-    runs-on: ubuntu-latest
-    needs: [JobA, JobB, JobC]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Unstash Job logs
-        uses: actions/download-artifact@v4
-        with:
-          pattern: Job*Data
-          merge-multiple: true
-      - name: Integrate logs -> combined.txt
-        shell: bash
-        run: |
-          cat JobA.log JobB.log JobC.log > combined.txt
-          echo "Integration complete"
-      - name: Stash integrationData
-        uses: actions/upload-artifact@v4
-        with:
-          name: integrationData
-          path: combined.txt
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: [integration]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Unstash integrationData
-        uses: actions/download-artifact@v4
-        with:
-          name: integrationData
-      - name: Deploy (print combined results)
-        shell: bash
-        run: |
-          echo "Deploy step using combined results:"
-          cat combined.txt
+          name: ${{ matrix.name }}Data
+          path: ${{ matrix.name }}.log
