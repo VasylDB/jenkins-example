@@ -16,9 +16,8 @@ jobs:
 
       - name: Generate RunID and prep.txt (Preparation)
         id: prep
-        shell: bash
         run: |
-          RUN_ID=$(python - <<'PY'import uuid; print(uuid.uuid4())PY)
+          RUN_ID=$(python -c "import uuid; print(uuid.uuid4())")
           echo "Preparation stage: RunID=${RUN_ID}"
           echo "Build Number: ${GITHUB_RUN_NUMBER}"
           printf "RunID=%s\n" "$RUN_ID" | tee prep.txt
