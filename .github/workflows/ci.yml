@@ -57,4 +57,64 @@ jobs:
       - name: Run ${{ matrix.name }} (produce log)
         shell: bash
         run: |
-          echo "${{ matrix.name }} ru
+          echo "${{ matrix.name }} running with $(cat prep.txt)" > "${{ matrix.name }}.log"
+          cat "${{ matrix.name }}.log"
+
+      - name: Stash ${{ matrix.name }}Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}Data
+          path: ${{ matrix.name }}.log
+          retention-days: 7
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: [run-jobs]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unstash all job logs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*Data"
+          merge-multiple: true
+
+      - name: Integrate logs -> combined.txt
+        shell: bash
+        run: |
+          ls -la
+          cat *.log > combined.txt
+          echo "Integration complete"
+
+      - name: Stash integrationData
+        uses: actions/upload-artifact@v4
+        with:
+          name: integrationData
+          path: combined.txt
+          retention-days: 7
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [integration]
+    steps:
+      - name: Unstash integrationData
+        uses: actions/download-artifact@v4
+        with:
+          name: integrationData
+
+      - name: Deploy (print combined results)
+        shell: bash
+        run: |
+          echo "Deploy step using combined results:"
+          cat combined.txt
+
+      - name: Job summary
+        shell: bash
+        run: |
+          {
+            echo "## Deployment output"
+            echo
+            echo '```'
+            cat combined.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
